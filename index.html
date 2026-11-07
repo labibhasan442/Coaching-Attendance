@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coaching Attendance</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f3f8;
+      margin: 0;
+      padding: 20px;
+    }
+    .card {
+      max-width: 480px;
+      margin: 30px auto;
+      background: white;
+      padding: 25px;
+      border-radius: 18px;
+      box-shadow: 0 4px 18px #0001;
+      text-align: center;
+    }
+    h1 { color: #17633b; font-size: 27px; }
+    select, button {
+      width: 100%;
+      padding: 16px;
+      margin: 12px 0;
+      border-radius: 10px;
+      font-size: 18px;
+    }
+    select { border: 1px solid #aaa; }
+    button {
+      background: #168044;
+      color: white;
+      border: 0;
+      font-weight: bold;
+    }
+    #reader { width: 100%; margin-top: 15px; }
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f0f3f8;
+      border-radius: 10px;
+      font-size: 17px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>COACHING ATTENDANCE</h1>
+    <p>QR Code Scan করে হাজিরা নিন</p>
+
+    <select id="branch">
+      <option value="হাজীনগর শাখা">হাজীনগর শাখা</option>
+      <option value="ক্যান্টবাজার শাখা">ক্যান্টবাজার শাখা</option>
+    </select>
+
+    <button id="startBtn" onclick="startScanner()">ক্যামেরা চালু করুন</button>
+    <div id="reader"></div>
+    <div id="result">ক্যামেরা চালু করে QR Code স্ক্যান করুন।</div>
+  </div>
+
+  <script>
+    let scanner;
+    let busy = false;
+
+    function startScanner() {
+      document.getElementById("result").innerText = "ক্যামেরা চালু হচ্ছে...";
+
+      if (!window.isSecureContext || !navigator.mediaDevices) {
+        document.getElementById("result").innerText =
+          "HTTPS পেজে খুলুন এবং Chrome ব্যবহার করুন।";
+        return;
+      }
+
+      scanner = new Html5Qrcode("reader");
+
+      scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 230, height: 230 } },
+        onScan,
+        () => {}
+      ).then(() => {
+        document.getElementById("result").innerText =
+          "ক্যামেরা চালু হয়েছে। QR Code স্ক্যান করুন।";
+        document.getElementById("startBtn").disabled = true;
+      }).catch(error => {
+        document.getElementById("result").innerText =
+          "ক্যামেরা চালু হয়নি: " + error;
+      });
+    }
+
+    function onScan(qr) {
+      if (busy) return;
+      busy = true;
+
+      const branch = document.getElementById("branch").value;
+      document.getElementById("result").innerText =
+        "হাজিরা নেওয়া হচ্ছে... " + qr;
+
+      scanner.pause(true);
+
+      const callbackName = "attendanceCallback_" + Date.now();
+
+      window[callbackName] = function(data) {
+        document.getElementById("result").innerText =
+          data.message || "সার্ভার থেকে উত্তর পাওয়া গেছে।";
+
+        delete window[callbackName];
+        script.remove();
+
+        setTimeout(() => {
+          busy = false;
+          if (scanner) scanner.resume();
+        }, 2000);
+      };
+
+      const script = document.createElement("script");
+      script.src =
+        "https://script.google.com/macros/s/AKfycbzza70xRSW9O_NPG_yPMe69BypsuxySBO9AGHDd15t-i-pzii3RRA5PYrcSBDqsE0lVyQ/exec" +
+        "?action=checkIn&qr=" + encodeURIComponent(qr) +
+        "&branch=" + encodeURIComponent(branch) +
+        "&callback=" + callbackName;
+
+      script.onerror = function() {
+        document.getElementById("result").innerText =
+          "সার্ভারের সঙ্গে সংযোগ হয়নি। আবার চেষ্টা করুন।";
+        delete window[callbackName];
+        busy = false;
+        if (scanner) scanner.resume();
+      };
+
+      document.body.appendChild(script);
+    }
+  </script>
+</body>
+</html>
